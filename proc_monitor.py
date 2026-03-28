@@ -1,39 +1,20 @@
 #!/usr/bin/env python3
 """Process monitor — track CPU/memory of running processes."""
-import sys, subprocess, time, json
-
-def get_procs(sort_by='cpu', limit=10):
-    cmd = ['ps', 'aux', '--sort', f'-{sort_by}' if sys.platform != 'darwin' else f'-o pid,pcpu,pmem,rss,comm']
-    if sys.platform == 'darwin':
-        cmd = ['ps', 'axo', 'pid,pcpu,pmem,rss,comm']
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    lines = result.stdout.strip().split('\n')
-    header = lines[0]; procs = []
-    for line in lines[1:limit+1]:
-        parts = line.split(None, 4)
-        if len(parts) >= 5:
-            procs.append({'pid':parts[0],'cpu':parts[1],'mem':parts[2],'rss':parts[3],'command':parts[4][:50]})
-    return procs
-
-def watch(pattern=None, interval=2, count=5):
-    for i in range(count):
-        procs = get_procs(limit=20)
-        if pattern:
-            procs = [p for p in procs if pattern.lower() in p['command'].lower()]
-        print(f"\n{'PID':>7} {'CPU%':>6} {'MEM%':>6} {'RSS MB':>8}  Command")
-        print('-' * 60)
-        for p in procs[:10]:
-            rss_mb = int(p['rss'])/1024
-            print(f"{p['pid']:>7} {p['cpu']:>6} {p['mem']:>6} {rss_mb:>8.1f}  {p['command']}")
-        if i < count-1: time.sleep(interval)
-
-if __name__ == '__main__':
-    if '--watch' in sys.argv:
-        pattern = sys.argv[2] if len(sys.argv) > 2 else None
-        watch(pattern)
-    elif '--json' in sys.argv:
-        print(json.dumps(get_procs(), indent=2))
-    elif len(sys.argv) > 1:
-        watch(sys.argv[1], count=1)
-    else:
-        watch(count=1)
+import subprocess,re,sys,time,json
+def get_processes(sort_by="cpu",limit=10):
+    cmd=["/bin/ps","aux"]; result=subprocess.run(cmd,capture_output=True,text=True)
+    lines=result.stdout.strip().split("\n"); procs=[]
+    for line in lines[1:]:
+        parts=line.split(None,10)
+        if len(parts)<11: continue
+        procs.append({"user":parts[0],"pid":int(parts[1]),"cpu":float(parts[2]),"mem":float(parts[3]),"vsz":int(parts[4]),"rss":int(parts[5]),"command":parts[10]})
+    key={"cpu":"cpu","mem":"mem","rss":"rss"}.get(sort_by,"cpu")
+    return sorted(procs,key=lambda p:p[key],reverse=True)[:limit]
+def summary():
+    procs=get_processes(limit=1000)
+    return {"total":len(procs),"total_cpu":sum(p["cpu"] for p in procs),"total_mem":sum(p["mem"] for p in procs),"top_cpu":procs[0] if procs else None}
+if __name__=="__main__":
+    top=get_processes(limit=5)
+    for p in top: print(f"PID {p['pid']:6d} CPU={p['cpu']:5.1f}% MEM={p['mem']:5.1f}% {p['command'][:60]}")
+    s=summary(); print(f"\nTotal: {s['total']} processes, {s['total_cpu']:.1f}% CPU, {s['total_mem']:.1f}% MEM")
+    print("Process monitor OK")
