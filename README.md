@@ -1,13 +1,11 @@
-# Proc Monitor
+# proc-monitor
 
-Process monitor — track CPU/memory of running processes.
+Process monitoring with CPU/memory tracking simulation.
 
 ## Usage
 
 ```bash
-python3 proc_monitor.py
+python3 proc_monitor.py test
 ```
 
-## License
-
-MIT
+Zero dependencies. Python 3.8+.
